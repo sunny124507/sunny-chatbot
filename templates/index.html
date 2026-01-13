@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Bot — Text to Image</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f7f7f9; }
+    .chat { max-width: 800px; margin: 0 auto; background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 16px; }
+    .messages { max-height: 60vh; overflow-y: auto; padding-right: 6px; }
+    .msg { display: flex; gap: 10px; margin-bottom: 12px; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: bold; }
+    .user { background: #3b82f6; }
+    .bot { background: #10b981; }
+    .bubble { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; max-width: 600px; }
+    .input { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+    textarea { width: 100%; resize: none; min-height: 44px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+    button { padding: 10px 14px; border: none; border-radius: 8px; background: #111827; color: #fff; cursor: pointer; }
+    .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+    .controls input, .controls select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+    canvas { display: none; } /* hidden; we show generated image via dataURL */
+    .img-wrap { margin-top: 8px; }
+    .img-wrap img { max-width: 100%; border: 1px solid #ddd; border-radius: 8px; }
+    .actions { display: flex; gap: 8px; margin-top: 6px; }
+    .small { font-size: 12px; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="chat">
+    <h3>AI Bot — Text to Image</h3>
+    <div class="small">Type a prompt. The bot will generate an image from your text using Canvas.</div>
+
+    <div class="controls">
+      <input id="width" type="number" value="1024" min="100" placeholder="Width (px)" />
+      <input id="height" type="number" value="512" min="100" placeholder="Height (px)" />
+      <input id="fontSize" type="number" value="48" min="8" placeholder="Font size (px)" />
+      <select id="align">
+        <option value="center" selected>Center</option>
+        <option value="left">Left</option>
+        <option value="right">Right</option>
+      </select>
+      <input id="textColor" type="color" value="#111827" />
+      <input id="bgColor" type="color" value="#ffffff" />
+      <input id="padding" type="number" value="40" min="0" placeholder="Padding (px)" />
+      <select id="format">
+        <option value="image/png" selected>PNG</option>
+        <option value="image/jpeg">JPEG</option>
+        <option value="image/webp">WebP</option>
+      </select>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="input">
+      <textarea id="prompt" placeholder="Describe the image text… e.g., 'Bold title: Summer Sale 50% OFF'"></textarea>
+      <button id="send">Send</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const promptEl = document.getElementById('prompt');
+    const sendBtn = document.getElementById('send');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const controls = {
+      width: document.getElementById('width'),
+      height: document.getElementById('height'),
+      fontSize: document.getElementById('fontSize'),
+      align: document.getElementById('align'),
+      textColor: document.getElementById('textColor'),
+      bgColor: document.getElementById('bgColor'),
+      padding: document.getElementById('padding'),
+      format: document.getElementById('format'),
+    };
+
+    function addMessage(role, contentNode) {
+      const row = document.createElement('div');
+      row.className = 'msg';
+
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar ' + (role === 'user' ? 'user' : 'bot');
+      avatar.textContent = role === 'user' ? 'U' : 'A';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.appendChild(contentNode);
+
+      row.appendChild(avatar);
+      row.appendChild(bubble);
+      messagesEl.appendChild(row);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function addText(role, text) {
+      const p = document.createElement('div');
+      p.textContent = text;
+      addMessage(role, p);
+    }
+
+    function wrapText(ctx, text, maxWidth) {
+      const words = text.split(/\s+/);
+      const lines = [];
+      let line = '';
+      for (let i = 0; i < words.length; i++) {
+        const test = line ? line + ' ' + words[i] : words[i];
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
+          line = words[i];
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    function generateImageFromText(text) {
+      const w = parseInt(controls.width.value, 10);
+      const h = parseInt(controls.height.value, 10);
+      const fontSize = parseInt(controls.fontSize.value, 10);
+      const align = controls.align.value;
+      const textColor = controls.textColor.value;
+      const bgColor = controls.bgColor.value;
+      const padding = parseInt(controls.padding.value, 10);
+      const format = controls.format.value;
+
+      canvas.width = w;
+      canvas.height = h;
+
+      // Background
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, w, h);
+
+      // Text
+      ctx.fillStyle = textColor;
+      ctx.font = `700 ${fontSize}px Arial, sans-serif`;
+      ctx.textBaseline = 'top';
+      ctx.textAlign = align;
+
+      const maxTextWidth = w - padding * 2;
+      const lines = [];
+      text.split('\n').forEach(p => {
+        lines.push(...wrapText(ctx, p, maxTextWidth));
+      });
+
+      const lineHeight = Math.round(fontSize * 1.25);
+      const totalHeight = lines.length * lineHeight;
+      let startX = padding;
+      if (align === 'center') startX = w / 2;
+      if (align === 'right') startX = w - padding;
+      const startY = Math.max(padding, (h - totalHeight) / 2);
+
+      lines.forEach((ln, i) => {
+        ctx.fillText(ln, startX, startY + i * lineHeight);
+      });
+
+      return { dataURL: canvas.toDataURL(format), format };
+    }
+
+    function addImageMessage(dataURL, format) {
+      const wrap = document.createElement('div');
+      wrap.className = 'img-wrap';
+
+      const img = document.createElement('img');
+      img.src = dataURL;
+      img.alt = 'Generated image';
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      const downloadBtn = document.createElement('button');
+      const ext = format.split('/')[1];
+      downloadBtn.textContent = `Download ${ext.toUpperCase()}`;
+      downloadBtn.addEventListener('click', () => {
+        const a = document.createElement('a');
+        a.href = dataURL;
+        a.download = `text-image.${ext}`;
+        a.click();
+      });
+
+      actions.appendChild(downloadBtn);
+      wrap.appendChild(img);
+      wrap.appendChild(actions);
+
+      addMessage('bot', wrap);
+    }
+
+    sendBtn.addEventListener('click', () => {
+      const text = promptEl.value.trim();
+      if (!text) return;
+      addText('user', text);
+
+      // Bot "thinking" message
+      const thinking = document.createElement('div');
+      thinking.textContent = 'Generating image…';
+      addMessage('bot', thinking);
+
+      // Generate and replace last bot message with image
+      const { dataURL, format } = generateImageFromText(text);
+      // Remove the thinking bubble (last child)
+      messagesEl.lastChild.remove();
+      addImageMessage(dataURL, format);
+
+      promptEl.value = '';
+    });
+
+    // Send on Enter (without Shift)
+    promptEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendBtn.click();
+      }
+    });
+
+    // Starter hint
+    addText('bot', 'Hi! Describe the text you want on the image, and I’ll generate it for you.');
+  </script>
+</body>
+</html>
