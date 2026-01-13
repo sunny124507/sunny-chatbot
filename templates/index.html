@@ -1,222 +1,240 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>AI Bot — Text to Image</title>
+  <meta charset="UTF-8">
+  <title>Azure AI Bot</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f7f7f9; }
-    .chat { max-width: 800px; margin: 0 auto; background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 16px; }
-    .messages { max-height: 60vh; overflow-y: auto; padding-right: 6px; }
-    .msg { display: flex; gap: 10px; margin-bottom: 12px; }
-    .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: bold; }
-    .user { background: #3b82f6; }
-    .bot { background: #10b981; }
-    .bubble { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; max-width: 600px; }
-    .input { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
-    textarea { width: 100%; resize: none; min-height: 44px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
-    button { padding: 10px 14px; border: none; border-radius: 8px; background: #111827; color: #fff; cursor: pointer; }
-    .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-    .controls input, .controls select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
-    canvas { display: none; } /* hidden; we show generated image via dataURL */
-    .img-wrap { margin-top: 8px; }
-    .img-wrap img { max-width: 100%; border: 1px solid #ddd; border-radius: 8px; }
-    .actions { display: flex; gap: 8px; margin-top: 6px; }
-    .small { font-size: 12px; color: #6b7280; }
+    body {
+      margin: 0;
+      font-family: "Roboto", "Segoe UI", Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      background: linear-gradient(135deg, #e0f7fa, #f1f8e9); /* soothing gradient */
+    }
+
+    /* Chat container */
+    .chat-container {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 16px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+      width: 90%;
+      max-width: 700px;
+      height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      backdrop-filter: blur(6px);
+    }
+
+    .chat-header {
+      padding: 15px;
+      background: linear-gradient(90deg, #0078D4, #00A4EF); /* Azure brand colors */
+      color: white;
+      font-weight: bold;
+      text-align: center;
+      font-size: 1.3em;
+      letter-spacing: 1px;
+      border-bottom: 2px solid #ddd;
+    }
+
+    #chatbox {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background-color: #f7f9fc;
+      font-size: 0.95em;
+      color: #333;
+    }
+
+    .message {
+      margin: 12px 0;
+      padding: 12px 16px;
+      border-radius: 8px;
+      max-width: 80%;
+      line-height: 1.5;
+      word-wrap: break-word;
+      animation: fadeIn 0.3s ease;
+    }
+    .user {
+      background-color: #e3f2fd;
+      color: #0d47a1;
+      align-self: flex-end;
+    }
+    .bot {
+      background-color: #e8f5e9;
+      color: #1b5e20;
+      align-self: flex-start;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Thinking animation (pulsing dots) */
+    .thinking {
+      display: flex;
+      align-items: center;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      margin: 0 3px;
+      background: #0078D4;
+      border-radius: 50%;
+      animation: pulse 1.2s infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes pulse {
+      0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+      40% { transform: scale(1.2); opacity: 1; }
+    }
+
+    /* Input area */
+    #input-area {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: #fff;
+      border-top: 1px solid #ddd;
+    }
+    #message {
+      flex: 1;
+      padding: 12px 15px;
+      border: 1px solid #ccc;
+      border-radius: 25px;
+      background: #f9f9f9;
+      color: #333;
+      font-size: 0.95em;
+      transition: all 0.3s ease;
+    }
+    #message:focus {
+      outline: none;
+      border-color: #0078D4;
+      box-shadow: 0 0 8px rgba(0,120,212,0.3);
+      background: #fff;
+    }
+    #message::placeholder {
+      color: #999;
+    }
+    button {
+      padding: 12px 20px;
+      margin-left: 10px;
+      border: none;
+      border-radius: 25px;
+      background: linear-gradient(90deg, #0078D4, #00A4EF);
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      font-weight: bold;
+    }
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 10px #0078D4;
+    }
+
+    /* Mic button */
+    #mic-btn {
+      margin-left: 10px;
+      border: none;
+      background: #f1f1f1;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.3s ease;
+    }
+    #mic-btn:hover {
+      background: #e0e0e0;
+    }
+    #mic-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: #0078D4;
+    }
   </style>
 </head>
 <body>
-  <div class="chat">
-    <h3>AI Bot — Text to Image</h3>
-    <div class="small">Type a prompt. The bot will generate an image from your text using Canvas.</div>
-
-    <div class="controls">
-      <input id="width" type="number" value="1024" min="100" placeholder="Width (px)" />
-      <input id="height" type="number" value="512" min="100" placeholder="Height (px)" />
-      <input id="fontSize" type="number" value="48" min="8" placeholder="Font size (px)" />
-      <select id="align">
-        <option value="center" selected>Center</option>
-        <option value="left">Left</option>
-        <option value="right">Right</option>
-      </select>
-      <input id="textColor" type="color" value="#111827" />
-      <input id="bgColor" type="color" value="#ffffff" />
-      <input id="padding" type="number" value="40" min="0" placeholder="Padding (px)" />
-      <select id="format">
-        <option value="image/png" selected>PNG</option>
-        <option value="image/jpeg">JPEG</option>
-        <option value="image/webp">WebP</option>
-      </select>
+  <div class="chat-container">
+    <div class="chat-header"><strong>⚡ Azure AI Bot</strong></div>
+    <div id="chatbox"></div>
+    <div id="input-area">
+      <input type="text" id="message" placeholder="Ask Azure AI Bot anything...">
+      <button onclick="sendMessage()">Send</button>
+      <button id="mic-btn" title="Speak to Azure AI Bot">
+        <!-- Mic icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zm-5 9a7.001 7.001 0 0 1-6.93-6H5a9 9 0 0 0 18 0h-2.07A7.001 7.001 0 0 1 12 20z"/>
+        </svg>
+      </button>
     </div>
-
-    <div class="messages" id="messages"></div>
-
-    <div class="input">
-      <textarea id="prompt" placeholder="Describe the image text… e.g., 'Bold title: Summer Sale 50% OFF'"></textarea>
-      <button id="send">Send</button>
-    </div>
-
-    <canvas id="canvas"></canvas>
   </div>
 
   <script>
-    const messagesEl = document.getElementById('messages');
-    const promptEl = document.getElementById('prompt');
-    const sendBtn = document.getElementById('send');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    async function sendMessage() {
+      const messageInput = document.getElementById("message");
+      const message = messageInput.value.trim();
+      if (!message) return;
 
-    const controls = {
-      width: document.getElementById('width'),
-      height: document.getElementById('height'),
-      fontSize: document.getElementById('fontSize'),
-      align: document.getElementById('align'),
-      textColor: document.getElementById('textColor'),
-      bgColor: document.getElementById('bgColor'),
-      padding: document.getElementById('padding'),
-      format: document.getElementById('format'),
-    };
+      const chatbox = document.getElementById("chatbox");
+      chatbox.innerHTML += `
+        <div class="message user"><strong>You:</strong> ${message}</div>
+      `;
 
-    function addMessage(role, contentNode) {
-      const row = document.createElement('div');
-      row.className = 'msg';
+      const typingDiv = document.createElement("div");
+      typingDiv.className = "message bot";
+      typingDiv.innerHTML = `<strong>Azure AI Bot:</strong> <span class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div></span>`;
+      chatbox.appendChild(typingDiv);
+      chatbox.scrollTop = chatbox.scrollHeight;
 
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar ' + (role === 'user' ? 'user' : 'bot');
-      avatar.textContent = role === 'user' ? 'U' : 'A';
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `message=${encodeURIComponent(message)}`
+        });
 
-      const bubble = document.createElement('div');
-      bubble.className = 'bubble';
-      bubble.appendChild(contentNode);
-
-      row.appendChild(avatar);
-      row.appendChild(bubble);
-      messagesEl.appendChild(row);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    function addText(role, text) {
-      const p = document.createElement('div');
-      p.textContent = text;
-      addMessage(role, p);
-    }
-
-    function wrapText(ctx, text, maxWidth) {
-      const words = text.split(/\s+/);
-      const lines = [];
-      let line = '';
-      for (let i = 0; i < words.length; i++) {
-        const test = line ? line + ' ' + words[i] : words[i];
-        if (ctx.measureText(test).width > maxWidth && line) {
-          lines.push(line);
-          line = words[i];
-        } else {
-          line = test;
-        }
+        const botReply = await response.text();
+        typingDiv.innerHTML = `<strong>Azure AI Bot:</strong> ${botReply}`;
+      } catch (error) {
+        typingDiv.innerHTML = `<strong>Azure AI Bot:</strong> ⚠️ Error connecting to server.`;
       }
-      if (line) lines.push(line);
-      return lines;
+
+      chatbox.scrollTop = chatbox.scrollHeight;
+      messageInput.value = "";
+      messageInput.focus();
     }
 
-    function generateImageFromText(text) {
-      const w = parseInt(controls.width.value, 10);
-      const h = parseInt(controls.height.value, 10);
-      const fontSize = parseInt(controls.fontSize.value, 10);
-      const align = controls.align.value;
-      const textColor = controls.textColor.value;
-      const bgColor = controls.bgColor.value;
-      const padding = parseInt(controls.padding.value, 10);
-      const format = controls.format.value;
-
-      canvas.width = w;
-      canvas.height = h;
-
-      // Background
-      ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, w, h);
-
-      // Text
-      ctx.fillStyle = textColor;
-      ctx.font = `700 ${fontSize}px Arial, sans-serif`;
-      ctx.textBaseline = 'top';
-      ctx.textAlign = align;
-
-      const maxTextWidth = w - padding * 2;
-      const lines = [];
-      text.split('\n').forEach(p => {
-        lines.push(...wrapText(ctx, p, maxTextWidth));
-      });
-
-      const lineHeight = Math.round(fontSize * 1.25);
-      const totalHeight = lines.length * lineHeight;
-      let startX = padding;
-      if (align === 'center') startX = w / 2;
-      if (align === 'right') startX = w - padding;
-      const startY = Math.max(padding, (h - totalHeight) / 2);
-
-      lines.forEach((ln, i) => {
-        ctx.fillText(ln, startX, startY + i * lineHeight);
-      });
-
-      return { dataURL: canvas.toDataURL(format), format };
-    }
-
-    function addImageMessage(dataURL, format) {
-      const wrap = document.createElement('div');
-      wrap.className = 'img-wrap';
-
-      const img = document.createElement('img');
-      img.src = dataURL;
-      img.alt = 'Generated image';
-
-      const actions = document.createElement('div');
-      actions.className = 'actions';
-
-      const downloadBtn = document.createElement('button');
-      const ext = format.split('/')[1];
-      downloadBtn.textContent = `Download ${ext.toUpperCase()}`;
-      downloadBtn.addEventListener('click', () => {
-        const a = document.createElement('a');
-        a.href = dataURL;
-        a.download = `text-image.${ext}`;
-        a.click();
-      });
-
-      actions.appendChild(downloadBtn);
-      wrap.appendChild(img);
-      wrap.appendChild(actions);
-
-      addMessage('bot', wrap);
-    }
-
-    sendBtn.addEventListener('click', () => {
-      const text = promptEl.value.trim();
-      if (!text) return;
-      addText('user', text);
-
-      // Bot "thinking" message
-      const thinking = document.createElement('div');
-      thinking.textContent = 'Generating image…';
-      addMessage('bot', thinking);
-
-      // Generate and replace last bot message with image
-      const { dataURL, format } = generateImageFromText(text);
-      // Remove the thinking bubble (last child)
-      messagesEl.lastChild.remove();
-      addImageMessage(dataURL, format);
-
-      promptEl.value = '';
-    });
-
-    // Send on Enter (without Shift)
-    promptEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendBtn.click();
+    document.getElementById("message").addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        sendMessage();
       }
     });
 
-    // Starter hint
-    addText('bot', 'Hi! Describe the text you want on the image, and I’ll generate it for you.');
+    // Mic button (Web Speech API demo)
+    const micBtn = document.getElementById("mic-btn");
+    micBtn.addEventListener("click", () => {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert("Speech recognition not supported in this browser.");
+        return;
+      }
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.start();
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("message").value = transcript;
+      };
+    });
   </script>
 </body>
 </html>
